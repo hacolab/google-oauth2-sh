@@ -1,22 +1,22 @@
 #!/bin/sh -u
 ################################################################################
 #-Authorization(OAuth2.0) for Google API.
-#-This script function is bellow.
+#-This script function is below.
 #-  - Generate Authroization-URI
 #-  - Get access_token & refresh_token
 #-  - Refresh & print access_token
-#-You must prepare the <ACCOUNT-FILE>.
+#-You must prepare the <Account-file>.
 #-
 # [VERSION]       0.0.1
 #
 #+[USAGE]
 #+  $0 [-hV]
-#+  $0 [-a][-b browser-command] <ACCOUNT-FILE>
-#+  $0 [-r] <ACCOUNT-FILE>
+#+  $0 [-a][-b browser-command] <Account-file>
+#+  $0 [-r] <Account-file>
 #+
 #-[OPTIONS]
 #-  -a            Generate authorization URI & get access_token & refresh_token.
-#-                Write the received refresh_token to <ACCOUNT_FILE>, and print access_token.
+#-                Write the received refresh_token to <Account_file>, and print access_token.
 #-
 #-  -b browser    Set Authroization-URI to browser argument.
 #-
@@ -28,20 +28,20 @@
 #-
 #-  -V            Print script version.
 #-
+#-[Account-file]
+#- Google account config file.
+#- This file is read by dot command. Therefor, the write rule is shell script format.
+#- Below variables are required.
+#-  - SCOPE         : http-param name is 'scope'
+#-  - CLIENT_ID     : http-param name is 'client_id'
+#-  - CLIENT_SECRET : http-param name is 'client_secret'
+#-  - REFRESH_TOKEN : http-param name is 'refresh_token' (auto set value by script)
+#-
 #-[EXIT-STATUS]
 #-  0             no error
 #-  1             parameter error
 #-  2             process error
 #-  3             user cancel
-#-
-#-[ACCOUNT-FILE]
-#- Google account config file.
-#- This file is read by dot command. Therefor, the write rule is shell script format.
-#- Bellow variables are required.
-#-  - SCOPE         : http-param name is 'scope'
-#-  - CLIENT_ID     : http-param name is 'client_id'
-#-  - CLIENT_SECRET : http-param name is 'client_secret'
-#-  - REFRESH_TOKEN : http-param name is 'refresh_token' (auto set value by script)
 #-
 #-[DEPENDENCY]
 #-  - curl
