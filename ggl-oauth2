@@ -41,7 +41,7 @@
 #-  0             no error
 #-  1             parameter error
 #-  2             process error
-#-  3             user cancel
+#-  9             user cancel
 #-
 #-[DEPENDENCY]
 #-  - curl
@@ -94,7 +94,7 @@ version_exit() {
 }
 
 # Signal catch
-trap 'cleanup; exit 3' SIGHUP SIGINT SIGQUIT SIGTERM
+trap 'cleanup; exit 9' SIGHUP SIGINT SIGQUIT SIGTERM
 
 ###################################################
 # Analyze options & parameters
