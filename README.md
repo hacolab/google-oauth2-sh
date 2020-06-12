@@ -35,6 +35,16 @@ See below for the procedure.
 
 ### 2. Create Google account config file.
 Please create simple text file.
+
+```
+$ cat << EOF > my-account-file
+SCOPE=
+CLIENT_ID=
+CLIENT_SECRET=
+EOF
+$ chmod 600 my-account-file
+```
+
 The format of that file is shell script code.
 For example, the following file.
 
@@ -49,47 +59,46 @@ Replace with the value for your application.
 
 
 ### 3. Generate Authorization-URI
+Use the "-a" flag to generate Authroization-URI.
 
 ```
-$ ggl-oauth2 -a "Account-File-Path"
+$ ./ggl-oauth2 -a my-account-file
 https://accounts.google.com/o/oauth2/v2/auth?client_id=XXXXXX.apps.googleusercontent.com&scope=https://mail.google.com/&response_type=code&access_type=offline&redirect_uri=urn:ietf:wg:oauth:2.0:oob
 please input authorization-code:
 ```
 
-### 4. Authorization Process
+### 4. Authorization procedure
 Access to Authorization-URI(got by step.3) by web browser.
-And get Authorization-code.
+And perform authorization procedure
+if success, get Authorization-code.
 
 ### 5. Get access-token & refresh-token
 
 Continue step3(`ggl-oauth2 -a` command), please input Authorization-code(got by step4)
-
-```
-please input authorization-code: 
-```
-
 Script gets access token and refresh token use input Authorization-code.
-If success, print got values and write refresh-token to Account-file.
 
 ```
-access_token: AAAAAAAAAAAAAAAAA
-refresh_token: BBBBBBBBBBBBBBBBB
+please input authorization-code: YYYYYYYYYYYYYYYYYY
+AAAAAAAAAAAAAAAAA
 ```
 
-See your Account-file, appended `REFRESH_TOKEN`.
+If success, print value of got access-token and write refresh-token to Account-file.
+
+See your Account-file, appended variable `REFRESH_TOKEN`.
 
 ```
 REFRESH_TOKEN=BBBBBBBBBBBBBBBBB
 ```
 
 ### 6. Refresh access-token
+Use the "-r" flag to refresh the access-token.
 
 ```
-$ ggl-oauth2 -r "Account-File-Path"
+$ ./ggl-oauth2 -r my-account-file
 ZZZZZZZZZZZZZZZZZ
 ```
 
-If success, only print value of new access-token.
+If success, print value of new access-token.
 
 ## Usage
 
