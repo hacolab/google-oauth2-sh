@@ -2,7 +2,7 @@
 ################################################################################
 #-Authorization(OAuth2.0) for Google API.
 #-This script function is below.
-#-  - Generate Authroization-URI
+#-  - Generate Authorization-URI
 #-  - Get access_token & refresh_token
 #-  - Refresh & print access_token
 #-You must prepare the <Account-file>.
@@ -18,7 +18,7 @@
 #-  -a            Generate authorization URI & get access_token & refresh_token.
 #-                Write the received refresh_token to <Account_file>, and print access_token.
 #-
-#-  -b browser    Set Authroization-URI to browser argument.
+#-  -b browser    Set Authorization-URI to browser argument.
 #-
 #-  -h            Print this script help.
 #-
@@ -76,20 +76,24 @@ usage_exit() {
   sed '/^[^#]/q' "$0"             \
   | sed -n '/^#+/s/^#+//p'        \
   | sed "s/\$0/${CMD_NAME}/g"     1>&2
+  cleanup
   exit 1
 }
 help_exit() {
   sed '/^[^#]/q' "$0"             \
   | sed -n '/^#[-+]/s/^#[-+]//p'  \
   | sed "s/\$0/${CMD_NAME}/g"     1>&2
+  cleanup
   exit 0
 }
 error_exit() {
   printf "\033[0;31m%s\033[0;39m\n" "$*" 1>&2
+  cleanup
   exit 2
 }
 version_exit() {
   sed -n "/^# \[VERSION\]/s/^# \[VERSION\] *//p" "$0" 1>&2
+  cleanup
   exit 0
 }
 
@@ -140,35 +144,35 @@ ACCOUNT_FILE=${1:-""}
 ACCESS_TOKEN=
 
 ###################################################
-# Main
+# Functions
 ###################################################
-# Get Auth-Code from browser
-# get access token
 pickup_value(){
   sed -n 's/^[^"].*"'$1'"[ ]*:[ "]*\([^",]\{1,\}\)[",]*.*$/\1/p'
 }
 check_response(){
-  grep -q "< HTTP/2 200" "$1"
-  if [ ! $? -ne 0 ]; then
-    grep "^< " "$1" 1>&2
+  grep -q "^< HTTP/2 200" "$1"
+  if [ $? -ne 0 ]; then
+    grep "^[<>] " "$1" 1>&2
     error_exit $2
   fi
 }
 write_config(){
   grep -q "^$2=" "$1"
   if [ $? -ne 0 ]; then
-    # update variable
-    sed -i "" "s@^ *$2=.*@$2=$3@" "$1"
-  else
     # append variable
     echo "$2=$3" >> "$1"
+  else
+    # update variable
+    sed -i "" "s@^ *$2=.*@$2=$3@" "$1"
   fi
 }
 
-
-# Authroization
+###################################################
+# Main
+###################################################
+# Authorization
 if [ -n "$MODE_AUTHORIZATION" ]; then
-  # get authroization-code
+  # get authorization-code
   "$BROWSER_CMD" "${AUTH_END_POINT}?client_id=${CLIENT_ID}&scope=${SCOPE}&response_type=code&access_type=offline&redirect_uri=${REDIRECT_URI}"
 
   printf "please input authorization-code: "
@@ -215,6 +219,6 @@ else
   echo $ACCESS_TOKEN
 fi
 
-# cleanup
+# Cleanup command process
 cleanup
 
