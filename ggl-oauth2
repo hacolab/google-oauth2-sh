@@ -1,0 +1,220 @@
+#!/bin/sh -u
+################################################################################
+#-Authorization(OAuth2.0) for Google API.
+#-This script function is bellow.
+#-  - Generate Authroization-URI
+#-  - Get access_token & refresh_token
+#-  - Refresh & print access_token
+#-You must prepare the <ACCOUNT-FILE>.
+#-
+# [VERSION]       0.0.1
+#
+#+[USAGE]
+#+  $0 [-hV]
+#+  $0 [-a][-b browser-command] <ACCOUNT-FILE>
+#+  $0 [-r] <ACCOUNT-FILE>
+#+
+#-[OPTIONS]
+#-  -a            Generate authorization URI & get access_token & refresh_token.
+#-                Write the received refresh_token to <ACCOUNT_FILE>, and print access_token.
+#-
+#-  -b browser    Set Authroization-URI to browser argument.
+#-
+#-  -h            Print this script help.
+#-
+#-  -r            Refresh access_token, and print new access_token.
+#-
+#-  -v            Verbose mode. print curl log, and print refresh_token.
+#-
+#-  -V            Print script version.
+#-
+#-[EXIT-STATUS]
+#-  0             no error
+#-  1             parameter error
+#-  2             process error
+#-  3             user cancel
+#-
+#-[ACCOUNT-FILE]
+#- Google account config file.
+#- This file is read by dot command. Therefor, the write rule is shell script format.
+#- Bellow variables are required.
+#-  - SCOPE         : http-param name is 'scope'
+#-  - CLIENT_ID     : http-param name is 'client_id'
+#-  - CLIENT_SECRET : http-param name is 'client_secret'
+#-  - REFRESH_TOKEN : http-param name is 'refresh_token' (auto set value by script)
+#-
+#-[DEPENDENCY]
+#-  - curl
+#-
+#-[REFERENCE]
+#-  - https://developers.google.com/identity/protocols/oauth2
+#-
+################################################################################
+CMD_NAME=$(basename $0)
+
+###################################################
+# Configs
+###################################################
+# local
+BROWSER_CMD=echo
+HTTP_LOG=/tmp/${CMD_NAME}_http.$$
+PROC_TMP=/tmp/${CMD_NAME}_tmp.$$
+
+# OAuth2.0 setting for Google APIs
+AUTH_END_POINT=https://accounts.google.com/o/oauth2/v2/auth
+TOKEN_END_POINT=https://oauth2.googleapis.com/token
+REDIRECT_URI=urn:ietf:wg:oauth:2.0:oob
+
+###################################################
+# Utilities
+###################################################
+cleanup(){
+  [ -f "$HTTP_LOG" ] && rm "$HTTP_LOG"
+  [ -f "$PROC_TMP" ] && rm "$PROC_TMP"
+}
+usage_exit() {
+  sed '/^[^#]/q' "$0"             \
+  | sed -n '/^#+/s/^#+//p'        \
+  | sed "s/\$0/${CMD_NAME}/g"     1>&2
+  exit 1
+}
+help_exit() {
+  sed '/^[^#]/q' "$0"             \
+  | sed -n '/^#[-+]/s/^#[-+]//p'  \
+  | sed "s/\$0/${CMD_NAME}/g"     1>&2
+  exit 0
+}
+error_exit() {
+  printf "\033[0;31m%s\033[0;39m\n" "$*" 1>&2
+  exit 2
+}
+version_exit() {
+  sed -n "/^# \[VERSION\]/s/^# \[VERSION\] *//p" "$0" 1>&2
+  exit 0
+}
+
+# Signal catch
+trap 'cleanup; exit 3' SIGHUP SIGINT SIGQUIT SIGTERM
+
+###################################################
+# Analyze options & parameters
+###################################################
+MODE_AUTHORIZATION=
+MODE_REFRESH_TOKEN=
+VERBOSE_LOG=
+while getopts ab:rvhV OPT; do
+  case $OPT in
+    a ) # authorization
+      MODE_AUTHORIZATION=1
+      ;;
+    b ) # set use browser
+      BROWSER_CMD="${OPTARG}"
+      ;;
+    r ) # refresh access-token (refresh-token request)
+      MODE_REFRESH_TOKEN=1
+      ;;
+    v ) # verbose mode
+      VERBOSE_LOG=--verbose
+      ;;
+    h ) # print help
+      help_exit
+      ;;
+    V ) # print version
+      version_exit
+      ;;
+    \? ) # invalid option
+      usage_exit
+  esac
+done
+shift $(expr $OPTIND - 1)
+
+ACCOUNT_FILE=${1:-""}
+[ ! -f "$ACCOUNT_FILE" ] && error_exit "account-file not found: ${ACCOUNT_FILE}"
+
+# Read account info
+. "$ACCOUNT_FILE"
+[ -z "$SCOPE" ] && error_exit "not set SCOPE in '${ACCOUNT_FILE}'"
+[ -z "$CLIENT_ID" ] && error_exit "not set CLIENT_ID in '${ACCOUNT_FILE}'"
+[ -z "$CLIENT_SECRET" ] && error_exit "not set CLIENT_SECRET in '${ACCOUNT_FILE}'"
+
+ACCESS_TOKEN=
+
+###################################################
+# Main
+###################################################
+# Get Auth-Code from browser
+# get access token
+pickup_value(){
+  sed -n 's/^[^"].*"'$1'"[ ]*:[ "]*\([^",]\{1,\}\)[",]*.*$/\1/p'
+}
+check_response(){
+  grep -q "< HTTP/2 200" "$1"
+  if [ ! $? -ne 0 ]; then
+    grep "^< " "$1" 1>&2
+    error_exit $2
+  fi
+}
+write_config(){
+  grep -q "^$2=" "$1"
+  if [ $? -ne 0 ]; then
+    # update variable
+    sed -i "" "s@^ *$2=.*@$2=$3@" "$1"
+  else
+    # append variable
+    echo "$2=$3" >> "$1"
+  fi
+}
+
+
+# Authroization
+if [ -n "$MODE_AUTHORIZATION" ]; then
+  # get authroization-code
+  "$BROWSER_CMD" "${AUTH_END_POINT}?client_id=${CLIENT_ID}&scope=${SCOPE}&response_type=code&access_type=offline&redirect_uri=${REDIRECT_URI}"
+
+  printf "please input authorization-code: "
+  read auth_code
+  [ -z "$auth_code" ] && error_exit "not input authorization-code!"
+
+  # get access-token & refresh-token
+  curl -s --verbose                   \
+    -d grant_type=authorization_code  \
+    -d client_id=$CLIENT_ID           \
+    -d client_secret=$CLIENT_SECRET   \
+    -d redirect_uri=$REDIRECT_URI     \
+    -d code=$auth_code                \
+    $TOKEN_END_POINT > "$HTTP_LOG" 2>&1
+
+  check_response "$HTTP_LOG" "authorization faild!"
+
+  ACCESS_TOKEN=$(pickup_value access_token < "$HTTP_LOG")
+  REFRESH_TOKEN=$(pickup_value refresh_token < "$HTTP_LOG")
+  write_config "$ACCOUNT_FILE" REFRESH_TOKEN "$REFRESH_TOKEN"
+fi
+
+# Refresh access token
+if [ -n "$MODE_REFRESH_TOKEN" ]; then
+  # refresh access-token
+  curl -s --verbose                   \
+    -d grant_type=refresh_token       \
+    -d client_id=$CLIENT_ID           \
+    -d client_secret=$CLIENT_SECRET   \
+    -d refresh_token=$REFRESH_TOKEN   \
+    $TOKEN_END_POINT > "$HTTP_LOG" 2>&1
+
+  check_response "$HTTP_LOG" "token refresh faild!"
+
+  ACCESS_TOKEN=$(pickup_value access_token < "$HTTP_LOG")
+fi
+
+# Show info
+if [ -n "$VERBOSE_LOG" ]; then
+  [ -f "$HTTP_LOG" ] && cat "$HTTP_LOG" | grep ^
+  echo "access_token: $ACCESS_TOKEN"
+  echo "refresh_token: $REFRESH_TOKEN"
+else
+  echo $ACCESS_TOKEN
+fi
+
+# cleanup
+cleanup
+
