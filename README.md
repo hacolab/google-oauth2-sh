@@ -3,8 +3,8 @@
 - [Description](#description)
 - [Requirement](#requirement)
 - [Installation](#installation)
-- [Getting Started Guide](#getting-started-guide)
 - [Usage](#usage)
+- [Getting Started Guide](#getting-started-guide)
 - [Licence](#licence)
 - [Author](#author)
 
@@ -22,10 +22,64 @@ $ git clone https://github.com/hacolab/google-oauth2-sh
 $ chmod +x google-oauth2-sh/ggl-oauth2
 ```
 
+## Usage
+
+```
+[USAGE]
+  ggl-oauth2 -g [-b browser-command] [-nv] <Account-file>
+  ggl-oauth2 -n [-v] <Account-file>
+  ggl-oauth2 -u [-v] <Account-file>
+  ggl-oauth2 -i [-a token | <Account-file>]
+  ggl-oauth2 [-hV]
+
+[OPTIONS]
+  -a token      set access_token. use with '-i'.
+
+  -b browser    Set Authorization-URI to browser argument. use with '-g'.
+
+  -g            Generate Authorization-URI.
+
+  -n            Get new access_token & refresh_token.
+                If success, Write the received refresh_token to <Account-file>,
+                and print value of access_token.
+
+  -i            Inquire infomation of access_token.
+
+  -u            Update access_token, and print value of new access_token.
+
+  -v            Verbose mode. print curl log and refresh_token.
+
+  -h            Print this script help.
+
+  -V            Print script version.
+
+[Account-file]
+ Google account config file.
+ This file is load by dot command. Therefor, the write rule is shell script format.
+ Below variables are required.
+  - SCOPE         : http-param name is 'scope'
+  - CLIENT_ID     : http-param name is 'client_id'
+  - CLIENT_SECRET : http-param name is 'client_secret'
+  - REFRESH_TOKEN : http-param name is 'refresh_token' (auto set value by script)
+
+[EXIT-STATUS]
+  0             no error
+  1             parameter error
+  2             process error
+  9             user cancel
+
+[DEPENDENCY]
+  - curl
+
+[REFERENCE]
+  - https://developers.google.com/identity/protocols/oauth2
+
+```
+
 ## Getting Started Guide
 
 ### 1. OAuth2.0 client register by Google Console
-Please setting your application.
+Please setting your application by google console.
 
 [https://console.developers.google.com/apis/credentials]
 
@@ -55,16 +109,14 @@ CLIENT_ID=XXXXXX.apps.googleusercontent.com
 CLIENT_SECRET=XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 ```
 
-Replace with the value for your application.
-
+Replace values for your application.
 
 ### 3. Generate Authorization-URI
-Use the "-a" flag to generate Authroization-URI.
+Use the "-g" flag to generate Authroization-URI.
 
 ```
-$ ./ggl-oauth2 -a my-account-file
+$ ./ggl-oauth2 -g my-account-file
 https://accounts.google.com/o/oauth2/v2/auth?client_id=XXXXXX.apps.googleusercontent.com&scope=https://mail.google.com/&response_type=code&access_type=offline&redirect_uri=urn:ietf:wg:oauth:2.0:oob
-please input authorization-code:
 ```
 
 ### 4. Authorization procedure
@@ -72,12 +124,14 @@ Access to Authorization-URI(got by step.3) by web browser.
 And perform authorization procedure
 if success, get Authorization-code.
 
-### 5. Get access-token & refresh-token
+### 5. Get new access-token & refresh-token
+Use the "-n" flag to get new access-token & refresh-token.
 
-Continue step3(`ggl-oauth2 -a` command), please input Authorization-code(got by step4)
+command), please input Authorization-code(got by step4)
 Script gets access token and refresh token use input Authorization-code.
 
 ```
+$ ./ggl-oauth2 -n my-account-file
 please input authorization-code: YYYYYYYYYYYYYYYYYY
 AAAAAAAAAAAAAAAAA
 ```
@@ -90,53 +144,16 @@ See your Account-file, appended variable `REFRESH_TOKEN`.
 REFRESH_TOKEN=BBBBBBBBBBBBBBBBB
 ```
 
-### 6. Refresh access-token
-Use the "-r" flag to refresh the access-token.
+### 6. Update access-token
+Use the "-u" flag to refresh the access-token.
+And print new access-token.
 
 ```
-$ ./ggl-oauth2 -r my-account-file
+$ ./ggl-oauth2 -u my-account-file
 ZZZZZZZZZZZZZZZZZ
 ```
 
 If success, print value of new access-token.
-
-## Usage
-
-```
-[USAGE]
-  ggl-oauth2 [-hV]
-  ggl-oauth2 [-a][-b browser-command] <Account-file>
-  ggl-oauth2 [-r] <Account-file>
-
-[OPTIONS]
-  -a            Generate authorization URI & get access_token & refresh_token.
-                Write the received refresh_token to <Account_file>, and print access_token.
-
-  -b browser    Set Authroization-URI to browser argument.
-
-  -h            Print this script help.
-
-  -r            Refresh access_token, and print new access_token.
-
-  -v            Verbose mode. print curl log, and print refresh_token.
-
-  -V            Print script version.
-
-[Account-file]
- Google account config file.
- This file is read by dot command. Therefor, the write rule is shell script format.
- Bellow variables are required.
-  - SCOPE         : http-param name is 'scope'
-  - CLIENT_ID     : http-param name is 'client_id'
-  - CLIENT_SECRET : http-param name is 'client_secret'
-  - REFRESH_TOKEN : http-param name is 'refresh_token' (auto set value by script)
-
-[EXIT-STATUS]
-  0             no error
-  1             parameter error
-  2             process error
-  3             user cancel
-```
 
 ## Licence
 
