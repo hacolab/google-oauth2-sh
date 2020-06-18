@@ -1,36 +1,46 @@
 #!/bin/sh -u
 ################################################################################
 #-Authorization(OAuth2.0) for Google API.
-#-This script function is below.
-#-  - Generate Authorization-URI
-#-  - Get access_token & refresh_token
-#-  - Refresh & print access_token
+#-Functions of this script are below.
+#-  * Generate Authorization-URI
+#-  * Get new access_token & refresh_token
+#-  * Get infomation of access_token
+#-  * Update access_token
 #-You must prepare the <Account-file>.
 #-
 # [VERSION]       0.0.1
 #
 #+[USAGE]
+#+  $0 -g [-b browser-command] [-nv] <Account-file>
+#+  $0 -n [-v] <Account-file>
+#+  $0 -u [-v] <Account-file>
+#+  $0 -i [-a token | <Account-file>]
 #+  $0 [-hV]
-#+  $0 [-a][-b browser-command] <Account-file>
-#+  $0 [-r] <Account-file>
 #+
 #-[OPTIONS]
-#-  -a            Generate authorization URI & get access_token & refresh_token.
-#-                Write the received refresh_token to <Account_file>, and print access_token.
+#-  -a token      set access_token. use with '-i'.
 #-
-#-  -b browser    Set Authorization-URI to browser argument.
+#-  -b browser    Set Authorization-URI to browser argument. use with '-g'.
+#-
+#-  -g            Generate Authorization-URI.
+#-
+#-  -n            Get new access_token & refresh_token.
+#-                If success, Write the received refresh_token to <Account-file>,
+#-                and print value of access_token.
+#-
+#-  -i            Inquire infomation of access_token.
+#-
+#-  -u            Update access_token, and print value of new access_token.
+#-
+#-  -v            Verbose mode. print curl log and refresh_token.
 #-
 #-  -h            Print this script help.
-#-
-#-  -r            Refresh access_token, and print new access_token.
-#-
-#-  -v            Verbose mode. print curl log, and print refresh_token.
 #-
 #-  -V            Print script version.
 #-
 #-[Account-file]
 #- Google account config file.
-#- This file is read by dot command. Therefor, the write rule is shell script format.
+#- This file is load by dot command. Therefor, the write rule is shell script format.
 #- Below variables are required.
 #-  - SCOPE         : http-param name is 'scope'
 #-  - CLIENT_ID     : http-param name is 'client_id'
@@ -103,19 +113,34 @@ trap 'cleanup; exit 9' SIGHUP SIGINT SIGQUIT SIGTERM
 ###################################################
 # Analyze options & parameters
 ###################################################
+MODE_GENERATE_AUTH_URI=
 MODE_AUTHORIZATION=
-MODE_REFRESH_TOKEN=
+MODE_UPDATE_TOKEN=
+MODE_INQUIRE_SCOPE=
 VERBOSE_LOG=
-while getopts ab:rvhV OPT; do
+ACCESS_TOKEN=
+while getopts a:b:ginuvhV OPT; do
   case $OPT in
-    a ) # authorization
-      MODE_AUTHORIZATION=1
+    a ) # set access-token
+      [ -z "$MODE_INQUIRE_SCOPE" ] && error_exit "'-a' is need use with '-i'"
+      ACCESS_TOKEN=$OPTARG
+      MODE_UPDATE_TOKEN=
       ;;
     b ) # set use browser
       BROWSER_CMD="${OPTARG}"
       ;;
-    r ) # refresh access-token (refresh-token request)
-      MODE_REFRESH_TOKEN=1
+    g ) # generate Authorization-URI
+      MODE_GENERATE_AUTH_URI=1
+      ;;
+    n ) # get new access-token & refresh-token
+      MODE_AUTHORIZATION=1
+      ;;
+    i ) # inquire scope of access-token
+      MODE_INQUIRE_SCOPE=1
+      MODE_UPDATE_TOKEN=1
+      ;;
+    u ) # update access-token (refresh-token request)
+      MODE_UPDATE_TOKEN=1
       ;;
     v ) # verbose mode
       VERBOSE_LOG=--verbose
@@ -132,16 +157,17 @@ while getopts ab:rvhV OPT; do
 done
 shift $(expr $OPTIND - 1)
 
-ACCOUNT_FILE=${1:-""}
-[ ! -f "$ACCOUNT_FILE" ] && error_exit "account-file not found: ${ACCOUNT_FILE}"
+if [ -z "$ACCESS_TOKEN" ]; then
+  ACCOUNT_FILE=${1:-""}
+  [ ! -f "$ACCOUNT_FILE" ] && error_exit "account-file not found: ${ACCOUNT_FILE}"
 
-# Read account info
-. "$ACCOUNT_FILE"
-[ -z "$SCOPE" ] && error_exit "not set SCOPE in '${ACCOUNT_FILE}'"
-[ -z "$CLIENT_ID" ] && error_exit "not set CLIENT_ID in '${ACCOUNT_FILE}'"
-[ -z "$CLIENT_SECRET" ] && error_exit "not set CLIENT_SECRET in '${ACCOUNT_FILE}'"
+  # Read account info
+  . "$ACCOUNT_FILE"
+  [ -z "$SCOPE" ] && error_exit "not set SCOPE in '${ACCOUNT_FILE}'"
+  [ -z "$CLIENT_ID" ] && error_exit "not set CLIENT_ID in '${ACCOUNT_FILE}'"
+  [ -z "$CLIENT_SECRET" ] && error_exit "not set CLIENT_SECRET in '${ACCOUNT_FILE}'"
+fi
 
-ACCESS_TOKEN=
 
 ###################################################
 # Functions
@@ -170,11 +196,13 @@ write_config(){
 ###################################################
 # Main
 ###################################################
-# Authorization
-if [ -n "$MODE_AUTHORIZATION" ]; then
-  # get authorization-code
+# Generate authorization-code
+if [ -n "$MODE_GENERATE_AUTH_URI" ]; then
   "$BROWSER_CMD" "${AUTH_END_POINT}?client_id=${CLIENT_ID}&scope=${SCOPE}&response_type=code&access_type=offline&redirect_uri=${REDIRECT_URI}"
+fi
 
+# Get new access-token & refresh-token
+if [ -n "$MODE_AUTHORIZATION" ]; then
   printf "please input authorization-code: "
   read auth_code
   [ -z "$auth_code" ] && error_exit "not input authorization-code!"
@@ -195,9 +223,8 @@ if [ -n "$MODE_AUTHORIZATION" ]; then
   write_config "$ACCOUNT_FILE" REFRESH_TOKEN "$REFRESH_TOKEN"
 fi
 
-# Refresh access token
-if [ -n "$MODE_REFRESH_TOKEN" ]; then
-  # refresh access-token
+# Update access-token
+if [ -n "$MODE_UPDATE_TOKEN" ]; then
   curl -s --verbose                   \
     -d grant_type=refresh_token       \
     -d client_id=$CLIENT_ID           \
@@ -205,17 +232,21 @@ if [ -n "$MODE_REFRESH_TOKEN" ]; then
     -d refresh_token=$REFRESH_TOKEN   \
     $TOKEN_END_POINT > "$HTTP_LOG" 2>&1
 
-  check_response "$HTTP_LOG" "token refresh faild!"
+  check_response "$HTTP_LOG" "access_token update faild!"
 
   ACCESS_TOKEN=$(pickup_value access_token < "$HTTP_LOG")
 fi
 
+
 # Show info
-if [ -n "$VERBOSE_LOG" ]; then
+if [ -n "$MODE_INQUIRE_SCOPE" ]; then
+  # Inquire infomation
+  curl -s "https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=${ACCESS_TOKEN}"
+elif [ -n "$VERBOSE_LOG" ]; then
   [ -f "$HTTP_LOG" ] && cat "$HTTP_LOG" | grep ^
   echo "access_token: $ACCESS_TOKEN"
   echo "refresh_token: $REFRESH_TOKEN"
-else
+elif [ -n "$ACCESS_TOKEN" ]; then
   echo $ACCESS_TOKEN
 fi
 
