@@ -25,25 +25,35 @@ $ chmod +x google-oauth2-sh/ggl-oauth2
 ## Usage
 
 ```
+Authorization(OAuth2.0) for Google API.
+Functions of this script are below.
+  * Generate Authorization-URI
+  * Get new access_token & refresh_token
+  * Get infomation of access_token
+  * Update access_token
+  * Revoke access_token & refresh_token
+You must prepare the <Account-file>.
+
 [USAGE]
-  ggl-oauth2 -g [-b browser-command] [-nv] <Account-file>
+  ggl-oauth2 -g [-b browser] [-nv] <Account-file>
+  ggl-oauth2 -i <token>
   ggl-oauth2 -n [-v] <Account-file>
+  ggl-oauth2 -r <token>
   ggl-oauth2 -u [-v] <Account-file>
-  ggl-oauth2 -i [-a token | <Account-file>]
   ggl-oauth2 [-hV]
 
 [OPTIONS]
-  -a token      set access_token. use with '-i'.
-
-  -b browser    Set Authorization-URI to browser argument. use with '-g'.
+  -b <browser>  Set Authorization-URI to browser argument. use with '-g'.
 
   -g            Generate Authorization-URI.
+
+  -i <token>    Inquire infomation of access_token.
 
   -n            Get new access_token & refresh_token.
                 If success, Write the received refresh_token to <Account-file>,
                 and print value of access_token.
 
-  -i            Inquire infomation of access_token.
+  -r <token>    Revoke access_token & refresh_token.
 
   -u            Update access_token, and print value of new access_token.
 
@@ -73,7 +83,6 @@ $ chmod +x google-oauth2-sh/ggl-oauth2
 
 [REFERENCE]
   - https://developers.google.com/identity/protocols/oauth2
-
 ```
 
 ## Getting Started Guide
@@ -99,7 +108,7 @@ EOF
 $ chmod 600 my-account-file
 ```
 
-The format of that file is shell script code.
+The format of my-account-file is shell script code.
 For example, the following file.
 
 ```

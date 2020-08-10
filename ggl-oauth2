@@ -6,29 +6,31 @@
 #-  * Get new access_token & refresh_token
 #-  * Get infomation of access_token
 #-  * Update access_token
+#-  * Revoke access_token & refresh_token
 #-You must prepare the <Account-file>.
 #-
-# [VERSION]       0.0.1
+# [VERSION]       0.1.0
 #
 #+[USAGE]
-#+  $0 -g [-b browser-command] [-nv] <Account-file>
+#+  $0 -g [-b browser] [-nv] <Account-file>
+#+  $0 -i <token> | <Account-file>
 #+  $0 -n [-v] <Account-file>
+#+  $0 -r <token> | <Account-file>
 #+  $0 -u [-v] <Account-file>
-#+  $0 -i [-a token | <Account-file>]
 #+  $0 [-hV]
 #+
 #-[OPTIONS]
-#-  -a token      set access_token. use with '-i'.
-#-
-#-  -b browser    Set Authorization-URI to browser argument. use with '-g'.
+#-  -b <browser>  Set Authorization-URI to browser argument. use with '-g'.
 #-
 #-  -g            Generate Authorization-URI.
+#-
+#-  -i <token>    Inquire infomation of access_token.
 #-
 #-  -n            Get new access_token & refresh_token.
 #-                If success, Write the received refresh_token to <Account-file>,
 #-                and print value of access_token.
 #-
-#-  -i            Inquire infomation of access_token.
+#-  -r <token>    Revoke access_token & refresh_token.
 #-
 #-  -u            Update access_token, and print value of new access_token.
 #-
@@ -65,7 +67,6 @@ CMD_NAME=$(basename $0)
 ###################################################
 # Configs
 ###################################################
-# local
 BROWSER_CMD=echo
 HTTP_LOG=/tmp/${CMD_NAME}_http.$$
 PROC_TMP=/tmp/${CMD_NAME}_tmp.$$
@@ -113,37 +114,54 @@ trap 'cleanup; exit 9' SIGHUP SIGINT SIGQUIT SIGTERM
 ###################################################
 # Analyze options & parameters
 ###################################################
+[ $# -eq 0 ] && usage_exit
+
 MODE_GENERATE_AUTH_URI=
 MODE_AUTHORIZATION=
 MODE_UPDATE_TOKEN=
+MODE_REVOKE_TOKEN=
 MODE_INQUIRE_SCOPE=
 VERBOSE_LOG=
 ACCESS_TOKEN=
-while getopts a:b:ginuvhV OPT; do
+ACCOUNT_FILE=
+while getopts b:gi:nr:uvhV OPT; do
   case $OPT in
-    a ) # set access-token
-      [ -z "$MODE_INQUIRE_SCOPE" ] && error_exit "'-a' is need use with '-i'"
-      ACCESS_TOKEN=$OPTARG
-      MODE_UPDATE_TOKEN=
-      ;;
     b ) # set use browser
       BROWSER_CMD="${OPTARG}"
       ;;
     g ) # generate Authorization-URI
       MODE_GENERATE_AUTH_URI=1
       ;;
+    i ) # inquire scope of access-token
+      MODE_INQUIRE_SCOPE=1
+      if [ -f "$OPTARG" ]; then
+        # set account-file
+        ACCOUNT_FILE=$OPTARG
+        MODE_UPDATE_TOKEN=1
+      else
+        # set access-token
+        ACCESS_TOKEN=$OPTARG
+      fi
+      ;;
     n ) # get new access-token & refresh-token
       MODE_AUTHORIZATION=1
       ;;
-    i ) # inquire scope of access-token
-      MODE_INQUIRE_SCOPE=1
-      MODE_UPDATE_TOKEN=1
+    r ) # revoke access-token & refresh-token
+      MODE_REVOKE_TOKEN=1
+      if [ -f "$OPTARG" ]; then
+        # set account-file
+        ACCOUNT_FILE=$OPTARG
+        MODE_UPDATE_TOKEN=1
+      else
+        # set access-token
+        ACCESS_TOKEN=$OPTARG
+      fi
       ;;
     u ) # update access-token (refresh-token request)
       MODE_UPDATE_TOKEN=1
       ;;
     v ) # verbose mode
-      VERBOSE_LOG=--verbose
+      VERBOSE_LOG=1
       ;;
     h ) # print help
       help_exit
@@ -157,8 +175,9 @@ while getopts a:b:ginuvhV OPT; do
 done
 shift $(expr $OPTIND - 1)
 
-if [ -z "$ACCESS_TOKEN" ]; then
-  ACCOUNT_FILE=${1:-""}
+
+[ -z "$ACCOUNT_FILE" ] && ACCOUNT_FILE=${1:-""}
+if [ -n "$ACCOUNT_FILE" ]; then
   [ ! -f "$ACCOUNT_FILE" ] && error_exit "account-file not found: ${ACCOUNT_FILE}"
 
   # Read account info
@@ -237,17 +256,22 @@ if [ -n "$MODE_UPDATE_TOKEN" ]; then
   ACCESS_TOKEN=$(pickup_value access_token < "$HTTP_LOG")
 fi
 
-
-# Show info
 if [ -n "$MODE_INQUIRE_SCOPE" ]; then
   # Inquire infomation
-  curl -s "https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=${ACCESS_TOKEN}"
+  curl -s "https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=${ACCESS_TOKEN}" \
+    | grep "^"
+elif [ -n "$MODE_REVOKE_TOKEN" ]; then
+  # Revoke access-token & refresh-token
+  curl -s "https://accounts.google.com/o/oauth2/revoke?token=${ACCESS_TOKEN}" \
+    | grep "^"
 elif [ -n "$VERBOSE_LOG" ]; then
+  # Print detail infomation
   [ -f "$HTTP_LOG" ] && cat "$HTTP_LOG" | grep ^
   echo "access_token: $ACCESS_TOKEN"
   echo "refresh_token: $REFRESH_TOKEN"
 elif [ -n "$ACCESS_TOKEN" ]; then
-  echo $ACCESS_TOKEN
+  # Print access-token
+  echo "$ACCESS_TOKEN"
 fi
 
 # Cleanup command process
